@@ -1,0 +1,37 @@
+stages:
+  ingest:
+    cmd: python -c "from src.data_ingestion import run_ingestion; run_ingestion(sample_size=50000)"
+    deps:
+      - src/data_ingestion.py
+      - src/config.py
+    outs:
+      - data/processed/loans_cleaned.parquet
+
+  features:
+    cmd: python -c "
+      from src.data_ingestion import load_from_parquet;
+      from src.feature_engineering import run_feature_engineering;
+      from src.feature_store import save_features;
+      df = load_from_parquet();
+      df = run_feature_engineering(df);
+      save_features(df)
+      "
+    deps:
+      - data/processed/loans_cleaned.parquet
+      - src/feature_engineering.py
+      - src/feature_store.py
+    outs:
+      - data/feature_store/engineered_features.parquet
+
+  train:
+    cmd: python run_pipeline.py --sample 50000
+    deps:
+      - src/training.py
+      - src/preprocessing.py
+      - src/evaluation.py
+      - data/processed/loans_cleaned.parquet
+    outs:
+      - models/best_model.joblib
+    metrics:
+      - reports/metrics.json:
+          cache: false
